@@ -1,20 +1,17 @@
 <#
-    PowerShell script to immediately print PDF sets for all active Revit MEP projects.
-    Place a file named 'userpaths.txt' in the same folder as this script with entries like:
+    Print PDF sets for all projects listed in projects.txt.
+    Place a file named 'userpaths.txt' in the same folder with entries like:
         PDF Output Folder: C:\Path\To\Output
         RushForth Automator EXE: C:\Path\To\RFAutomator.exe
-        Newforma CLI: C:\Path\To\NFProjectList.exe
         Scheduled Tasks Folder: C:\Path\To\ScheduledTasks
-        Project Folder: C:\Path\To\Projects
-    Replace the example paths with your own local paths. The PDF Output Folder path
-    is used to overwrite the output location in each automation text file before
-    printing.
+    Edit 'projects.txt' to list your project folders or Autodesk Docs URIs.
 #>
 
-$pathFile = Join-Path $PSScriptRoot 'userpaths.txt'
-if (-not (Test-Path $pathFile)) {
-    throw "userpaths.txt not found. Please create it with your paths."
-}
+$pathFile     = Join-Path $PSScriptRoot 'userpaths.txt'
+$projectsFile = Join-Path $PSScriptRoot 'projects.txt'
+
+if (-not (Test-Path $pathFile)) { throw 'userpaths.txt not found.' }
+if (-not (Test-Path $projectsFile)) { throw 'projects.txt not found.' }
 
 $pathMap = @{}
 Get-Content $pathFile | ForEach-Object {
@@ -22,40 +19,44 @@ Get-Content $pathFile | ForEach-Object {
         $pathMap[$matches[1].Trim()] = $matches[2].Trim()
     }
 }
-
 function Get-UserPath([string]$key) {
     if ($pathMap.ContainsKey($key)) { return $pathMap[$key] }
     throw "Path '$key' missing from userpaths.txt"
 }
 
-$nfProjectList = Get-UserPath 'Newforma CLI'
-$automatorExe  = Get-UserPath 'RushForth Automator EXE'
-$automationDir  = Get-UserPath 'Scheduled Tasks Folder'
-$pdfOutput      = Get-UserPath 'PDF Output Folder'
+$automatorExe = Get-UserPath 'RushForth Automator EXE'
+$automationDir = Get-UserPath 'Scheduled Tasks Folder'
+$pdfOutput = Get-UserPath 'PDF Output Folder'
 
-if (-not (Test-Path $nfProjectList)) { throw "NFProjectList not found at $nfProjectList" }
 if (-not (Test-Path $automatorExe)) { throw "RFAutomator not found at $automatorExe" }
-if (-not (Test-Path $automationDir))  { throw "Automation directory not found at $automationDir" }
+if (-not (Test-Path $automationDir)) { throw "Automation directory not found at $automationDir" }
 
-$projects = & $nfProjectList -active -type MEP | Where-Object { $_ -ne '' }
-if (-not $projects) { Write-Host 'No active projects found.'; return }
+$projectLines = Get-Content $projectsFile | Where-Object { $_.Trim() -ne '' -and -not $_.Trim().StartsWith('#') }
+if (-not $projectLines) { Write-Host 'No projects listed.'; return }
 
-foreach ($project in $projects) {
-    $name = [System.IO.Path]::GetFileNameWithoutExtension($project)
-    $txt  = Join-Path $automationDir "RF Automator_${name}_Print Sheets.txt"
-
-    if (-not (Test-Path $txt)) {
-        Write-Warning "Automation file not found for $name"
-        continue
+foreach ($line in $projectLines) {
+    $projectName = $null
+    if ($line -like '*Autodesk Docs*') {
+        $tokens = $line -split '\s+'
+        $rvtName = $tokens[0]
+        $projectName = [System.IO.Path]::GetFileNameWithoutExtension($rvtName)
+    } else {
+        $projectDir = $line.Trim()
+        $searchPath = Join-Path $projectDir '03 - Design\Revit PME Drawings'
+        $rvtFile = Get-ChildItem -Path $searchPath -Filter '*.rvt' -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '(?i)mech' } | Select-Object -First 1
+        if (-not $rvtFile) { Write-Warning "No mech Revit file found in $projectDir"; continue }
+        $projectName = $rvtFile.BaseName
     }
 
-    # ensure PDF output path matches user preference
+    $txt = Join-Path $automationDir "RF Automator_${projectName}_Print Sheets.txt"
+    if (-not (Test-Path $txt)) { Write-Warning "Automation file not found for $projectName"; continue }
+
     $content = Get-Content $txt -Raw
-    $pdfPath = Join-Path $pdfOutput ("${name}.pdf")
+    $pdfPath = Join-Path $pdfOutput "${projectName}.pdf"
     $updated = $content -replace '"[^" ]*?\.pdf"', '"' + $pdfPath + '"'
     if ($updated -ne $content) { Set-Content $txt $updated }
 
-    Write-Host "Printing sheets for $name"
+    Write-Host "Printing sheets for $projectName"
     Start-Process -FilePath $automatorExe -ArgumentList "\"$txt\"" -Wait
 }
 

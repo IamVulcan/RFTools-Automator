@@ -1,0 +1,14 @@
+# List of active projects
+#
+# Local project: provide the full path to the project directory
+# Example:
+# N:\Projects\2024\045.00 Valerie C Woodard Ctr- Energy Retrofits
+#
+# Autodesk Docs project: provide the Autodesk Docs URI and any extra fields
+# separated by tabs or spaces. Example:
+# Mech_Clover SD2_Fieldhouse_R23.rvt Autodesk Docs://022661.00_Clover SD2 - New High School/Mech_Clover SD2_Fieldhouse_R23.rvt 2023 866d5641-33c2-4ecf-9f1d-4d40dbdc7342
+#
+# Replace the sample lines below with your own projects.
+
+N:\Projects\2024\045.00 Valerie C Woodard Ctr- Energy Retrofits
+Mech_Clover SD2_Fieldhouse_R23.rvt Autodesk Docs://022661.00_Clover SD2 - New High School/Mech_Clover SD2_Fieldhouse_R23.rvt 2023 866d5641-33c2-4ecf-9f1d-4d40dbdc7342

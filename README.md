@@ -1,26 +1,24 @@
 # RFTools Automator Print Automation
 
-This repository contains PowerShell scripts to automate printing PDF sets for active Revit MEP projects. `NFProjectList.exe` is used to discover active projects and each project has its own RushForth Automator (`RFAutomator.exe`) print automation saved as a **.txt** file.
+This repository contains PowerShell scripts to automate printing PDF sets for active Revit MEP projects using RushForth Automator.
 
 ## Scripts
 
-- **print_mep_sheets.ps1** – Queries Newforma for active projects and runs each project's automation file to immediately print sheets to PDF.
-- **schedule_prints.ps1** – Creates a Windows scheduled task for every active project so its automation file runs daily at **1:00 AM**.
+- **print_mep_sheets.ps1** – Reads the project list from `projects.txt` and runs each project's automation file to immediately print sheets to PDF.
+- **schedule_prints.ps1** – Creates a Windows scheduled task for every project so its automation file runs daily at **1:00 AM**.
 
 ## Setup
 
-1. Copy `userpaths.txt` and edit each path so it matches your environment. Example entries:
+1. Edit `userpaths.txt` and set the paths for your environment. Example:
 
    ```
    PDF Output Folder: C:\PDF\Output
    RushForth Automator EXE: C:\Tools\RFAutomator.exe
-   Newforma CLI: C:\Tools\NFProjectList.exe
    Scheduled Tasks Folder: C:\Automation\ScheduledTasks
-   Project Folder: C:\RevitProjects
    ```
 
-   `print_mep_sheets.ps1` and `schedule_prints.ps1` read these paths at runtime. The **PDF Output Folder** value is written into each automation `.txt` file before printing.
-2. Ensure each project has a print automation file named `RF Automator_<PROJECT_NAME>_Print Sheets.txt` in the folder specified by `Scheduled Tasks Folder:`.
+   These scripts use the paths at runtime and overwrite the PDF location in each automation `.txt` file before printing.
+2. List all of your projects in `projects.txt`. See the comments in that file for the required format. Each project must have a print automation file named `RF Automator_<PROJECT_NAME>_Print Sheets.txt` in the folder specified by `Scheduled Tasks Folder:`.
 
 ## Scheduling
 

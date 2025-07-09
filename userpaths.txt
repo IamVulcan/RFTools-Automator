@@ -1,5 +1,3 @@
 PDF Output Folder: C:\Path\To\Output
 RushForth Automator EXE: C:\Path\To\RFAutomator.exe
-Newforma CLI: C:\Path\To\NFProjectList.exe
-Project Folder: C:\Path\To\Projects
 Scheduled Tasks Folder: C:\Path\To\ScheduledTasks
