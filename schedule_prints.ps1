@@ -1,45 +1,59 @@
 <#
     Register a Windows scheduled task for each active Revit MEP project.
-    The task runs RFAutomator.exe with the project's automation text file every day at 1:00 AM.
+    Paths are provided via 'userpaths.txt' located beside this script. Example contents:
+        PDF Output Folder: C:\Path\To\Output
+        RushForth Automator EXE: C:\Path\To\RFAutomator.exe
+        Newforma CLI: C:\Path\To\NFProjectList.exe
+        Scheduled Tasks Folder: C:\Path\To\ScheduledTasks
+        Project Folder: C:\Path\To\Projects
+    Update the placeholders with your own paths before running this script.
 #>
 
-# Path to Newforma project list CLI
-$nfProjectList = "C:\Users\acurrie\Documents\RFTools Files\RFAutomation\NFProjectList.exe"
+$pathFile = Join-Path $PSScriptRoot 'userpaths.txt'
+if (-not (Test-Path $pathFile)) { throw "userpaths.txt not found." }
 
-# Path to RushForth Automator executable
-$automatorExe = "C:\Users\acurrie\Documents\RFTools Files\RFAutomation\RFAutomator.exe"
-
-# Folder containing automation text files
-$automationDir = "C:\Users\acurrie\Documents\RFTools Files\RFAutomation\Scheduled Tasks"
-
-if (-not (Test-Path $nfProjectList)) {
-    Write-Error "NFProjectList not found at $nfProjectList"
-    exit 1
+$pathMap = @{}
+Get-Content $pathFile | ForEach-Object {
+    if ($_ -match '^\s*([^:]+)\s*:\s*(.+)$') {
+        $pathMap[$matches[1].Trim()] = $matches[2].Trim()
+    }
 }
 
-if (-not (Test-Path $automatorExe)) {
-    Write-Error "RFAutomator not found at $automatorExe"
-    exit 1
+function Get-UserPath([string]$key) {
+    if ($pathMap.ContainsKey($key)) { return $pathMap[$key] }
+    throw "Path '$key' missing from userpaths.txt"
 }
 
-$projects = & $nfProjectList -active -type MEP | Where-Object { $_ -ne "" }
+$nfProjectList = Get-UserPath 'Newforma CLI'
+$automatorExe  = Get-UserPath 'RushForth Automator EXE'
+$automationDir  = Get-UserPath 'Scheduled Tasks Folder'
+$pdfOutput      = Get-UserPath 'PDF Output Folder'
 
-if (-not $projects) {
-    Write-Host "No active projects found."
-    exit 0
-}
+if (-not (Test-Path $nfProjectList)) { throw "NFProjectList not found at $nfProjectList" }
+if (-not (Test-Path $automatorExe)) { throw "RFAutomator not found at $automatorExe" }
+if (-not (Test-Path $automationDir))  { throw "Automation directory not found at $automationDir" }
+
+$projects = & $nfProjectList -active -type MEP | Where-Object { $_ -ne '' }
+if (-not $projects) { Write-Host 'No active projects found.'; return }
 
 foreach ($project in $projects) {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($project)
-    $txt = Join-Path $automationDir "RF Automator_${name}_Print Sheets.txt"
+    $txt  = Join-Path $automationDir "RF Automator_${name}_Print Sheets.txt"
+
     if (-not (Test-Path $txt)) {
         Write-Warning "Automation file not found for $name"
         continue
     }
 
+    # update PDF path so the scheduled task outputs to the desired folder
+    $content = Get-Content $txt -Raw
+    $pdfPath = Join-Path $pdfOutput ("${name}.pdf")
+    $updated = $content -replace '"[^" ]*?\.pdf"', '"' + $pdfPath + '"'
+    if ($updated -ne $content) { Set-Content $txt $updated }
+
     $taskName = "RF Automator_${name}_Print Sheets"
-    $action = New-ScheduledTaskAction -Execute $automatorExe -Argument "\"$txt\""
-    $trigger = New-ScheduledTaskTrigger -Daily -At 1:00AM
+    $action   = New-ScheduledTaskAction -Execute $automatorExe -Argument "\"$txt\""
+    $trigger  = New-ScheduledTaskTrigger -Daily -At 1:00AM
 
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Force
     Write-Host "Scheduled task '$taskName' created to run $txt at 1:00 AM."
